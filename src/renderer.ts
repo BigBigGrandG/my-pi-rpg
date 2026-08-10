@@ -1,10 +1,14 @@
 import { AUTO, Core, Game, Input, Scene, Types } from 'phaser';
 import './index.css';
 import {
-  advancePlayer,
-  type MovementInput,
-  type PlayerPosition,
-} from './domain/player-movement';
+  advanceWorld,
+  createWorldState,
+  PLAYER_SPEED,
+  type FacingDirection,
+  type InputSnapshot,
+  type WorldRules,
+  type WorldState,
+} from './domain/world-state';
 import {
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -18,18 +22,22 @@ const MOVEMENT_BOUNDS = {
   height: GAME_HEIGHT,
   playerSize: PLAYER_SIZE,
 } as const;
+const WORLD_RULES: WorldRules = {
+  playerSpeed: PLAYER_SPEED,
+  movementBounds: MOVEMENT_BOUNDS,
+};
 
-type Direction = 'up' | 'down' | 'left' | 'right';
+type Direction = FacingDirection;
 type DirectionKey = { isDown: boolean };
 type DirectionKeys = Record<Direction, DirectionKey>;
 type PlayerView = { setPosition: (x: number, y: number) => void };
 
 class PlayerScene extends Scene {
   private player: PlayerView | null = null;
-  private playerPosition: PlayerPosition = {
+  private worldState: WorldState = createWorldState({
     x: GAME_WIDTH / 2,
     y: GAME_HEIGHT / 2,
-  };
+  });
   private cursorKeys: DirectionKeys | null = null;
   private wasdKeys: DirectionKeys | null = null;
 
@@ -42,8 +50,8 @@ class PlayerScene extends Scene {
 
     this.player = this.add
       .rectangle(
-        this.playerPosition.x,
-        this.playerPosition.y,
+        this.worldState.player.position.x,
+        this.worldState.player.position.y,
         PLAYER_SIZE,
         PLAYER_SIZE,
         PLAYER_COLOR,
@@ -76,16 +84,17 @@ class PlayerScene extends Scene {
       return;
     }
 
-    this.playerPosition = advancePlayer(
-      this.playerPosition,
+    this.worldState = advanceWorld(
+      this.worldState,
       this.readMovementInput(),
       delta / 1000,
-      MOVEMENT_BOUNDS,
+      WORLD_RULES,
     );
-    this.player.setPosition(this.playerPosition.x, this.playerPosition.y);
+    const { position } = this.worldState.player;
+    this.player.setPosition(position.x, position.y);
   }
 
-  private readMovementInput(): MovementInput {
+  private readMovementInput(): InputSnapshot {
     return {
       up: this.isDirectionDown('up'),
       down: this.isDirectionDown('down'),
