@@ -2,7 +2,7 @@
 
 ## Project overview
 
-This repository is for a long-term, top-down JRPG inspired by classic Dragon Quest games. The planned stack is Phaser, Electron, TypeScript, and the Pi SDK. Pi provides the agent loop for NPC dialogue and decisions; it is not the game engine and must not own authoritative game state.
+This repository is for a long-term, top-down farming and social RPG inspired by games such as *Harvest Moon: Friends of Mineral Town*, where the player develops a farm to earn money and materials, builds relationships and discovers information through NPC interactions, and uses those relationships and discoveries to unlock and advance storylines. The planned stack is Phaser, Electron, TypeScript, and the Pi SDK. Pi provides the agent loop for NPC dialogue and decisions; it is not the game engine and must not own authoritative game state.
 
 The core architectural rule is:
 

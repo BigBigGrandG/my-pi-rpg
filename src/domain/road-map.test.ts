@@ -130,17 +130,18 @@ describe('ROAD_MAP', () => {
 
   it('shows Leah as the interaction target inside and at the distance threshold', () => {
     for (const distance of [47, LEAH_INTERACTION_DISTANCE]) {
-      const position = {
-        x: LEAH.position.x - distance,
-        y: LEAH.position.y,
-      };
-      const state = createWorldState(position);
       const next = advanceWorld(
         {
-          ...state,
+          ...createWorldState({
+            x: LEAH.position.x - distance,
+            y: LEAH.position.y,
+          }),
           player: {
-            ...state.player,
-            position,
+            ...createWorldState({ x: 0, y: 0 }).player,
+            position: {
+              x: LEAH.position.x - distance,
+              y: LEAH.position.y,
+            },
             facing: 'right',
           },
         },
@@ -155,11 +156,10 @@ describe('ROAD_MAP', () => {
 
   it('hides Leah as the interaction target outside the distance threshold', () => {
     const distance = LEAH_INTERACTION_DISTANCE + 1;
-    const position = {
+    const state = createWorldState({
       x: LEAH.position.x - distance,
       y: LEAH.position.y,
-    };
-    const state = createWorldState(position);
+    });
 
     const next = advanceWorld(
       {
@@ -222,11 +222,10 @@ describe('ROAD_MAP', () => {
   });
 
   it('hides Leah while dialogue is open', () => {
-    const position = {
+    const state = createWorldState({
       x: LEAH.position.x - 32,
       y: LEAH.position.y,
-    };
-    const state = createWorldState(position);
+    });
 
     const next = advanceWorld(
       {
@@ -248,29 +247,31 @@ describe('ROAD_MAP', () => {
   });
 
   it('blocks movement through Leah and keeps diagonal movement sliding on the free axis', () => {
-    const start = {
-      x: LEAH.position.x - 16,
-      y: LEAH.position.y,
-    };
     const blocked = advanceWorld(
-      createWorldState(start),
+      createWorldState({
+        x: LEAH.position.x - 16,
+        y: LEAH.position.y,
+      }),
       { up: false, down: false, left: false, right: true },
       10,
       ROAD_WORLD_RULES,
     );
 
-    expect(blocked.player.position.x).toBeCloseTo(start.x, 3);
-    expect(blocked.player.position.y).toBe(start.y);
+    expect(blocked.player.position.x).toBeCloseTo(LEAH.position.x - 16, 3);
+    expect(blocked.player.position.y).toBe(LEAH.position.y);
 
     const sliding = advanceWorld(
-      createWorldState(start),
+      createWorldState({
+        x: LEAH.position.x - 16,
+        y: LEAH.position.y,
+      }),
       { up: true, down: false, left: false, right: true },
       0.1,
       ROAD_WORLD_RULES,
     );
 
-    expect(sliding.player.position.x).toBeCloseTo(start.x, 3);
-    expect(sliding.player.position.y).toBeLessThan(start.y);
+    expect(sliding.player.position.x).toBeCloseTo(LEAH.position.x - 16, 3);
+    expect(sliding.player.position.y).toBeLessThan(LEAH.position.y);
     expect(sliding.player.isMoving).toBe(true);
   });
 });
