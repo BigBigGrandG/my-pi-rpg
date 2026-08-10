@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ESNext",
+    "strict": true,
+    "allowJs": false,
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"],
+    // Phaser 4.2.1 and Forge's Vite plugin currently ship declaration errors;
+    // keep strict checking for project sources while isolating those vendor files.
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*.ts",
+    "forge.config.ts",
+    "forge.env.d.ts",
+    "vite.*.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "out",
+    ".vite"
+  ]
+}
