@@ -1,5 +1,6 @@
 import type { DialogueDefinition } from '../domain/dialogue';
 import { getDialoguePanelLayout } from './dialogue-presentation';
+import { SCENE_RENDER_DEPTHS } from './render-depths';
 import type { GameObjects, Scene } from 'phaser';
 
 export const createDialoguePanel = (
@@ -21,7 +22,7 @@ export const createDialoguePanel = (
   const panel = scene.add
     .container(panelCenterX, panelCenterY)
     .setScrollFactor(0)
-    .setDepth(20);
+    .setDepth(SCENE_RENDER_DEPTHS.dialogue);
   const background = scene.add.graphics();
   background.fillStyle(0x1b1a27, 0.97);
   background.fillRect(

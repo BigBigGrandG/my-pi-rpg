@@ -19,3 +19,15 @@ files under `assets/game/runtime/`.
 
 Run `npm run assets:normalize` to regenerate the derivatives after intentionally
 updating one of these source files.
+
+## Provenance and licensing
+
+The source PNGs are original AI-generated artwork supplied by the project owner
+for My Pi RPG. No third-party provider, prompt archive, or separate asset
+license notice was supplied with the repository, so the source artwork must be
+attributed as `Original AI-generated artwork supplied by Wayne for My Pi RPG`.
+The generated files under `runtime/` are project derivatives of those sources.
+
+The package's MIT declaration applies to the project code; it does not by
+itself grant separate redistribution rights for the source artwork. Update this
+section if the owner supplies a provider attribution or different asset terms.

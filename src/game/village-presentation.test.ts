@@ -3,10 +3,8 @@ import {
   VILLAGE_BUILDINGS,
   VILLAGE_DECORATIONS,
 } from '../domain/village-layout';
-import {
-  getVillageRenderItems,
-  VILLAGE_RENDER_DEPTHS,
-} from './village-presentation';
+import { getVillageRenderItems } from './village-presentation';
+import { SCENE_RENDER_DEPTHS } from './render-depths';
 
 describe('village presentation', () => {
   it('projects every static placement to a bottom-anchored texture item', () => {
@@ -16,12 +14,12 @@ describe('village presentation', () => {
       VILLAGE_DECORATIONS.length + VILLAGE_BUILDINGS.length,
     );
     expect(items.slice(0, VILLAGE_DECORATIONS.length).every((item) =>
-      item.depth === VILLAGE_RENDER_DEPTHS.environment &&
+      item.depth === SCENE_RENDER_DEPTHS.environment &&
       item.origin.x === 0.5 &&
       item.origin.y === 1,
     )).toBe(true);
     expect(items.slice(VILLAGE_DECORATIONS.length).every((item) =>
-      item.depth === VILLAGE_RENDER_DEPTHS.building &&
+      item.depth === SCENE_RENDER_DEPTHS.buildings &&
       item.origin.x === 0.5 &&
       item.origin.y === 1,
     )).toBe(true);

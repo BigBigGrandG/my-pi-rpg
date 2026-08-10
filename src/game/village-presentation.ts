@@ -6,11 +6,7 @@ import {
   VILLAGE_DECORATIONS,
 } from '../domain/village-layout';
 import { RUNTIME_DECORATION_ASSETS } from './runtime-assets';
-
-export const VILLAGE_RENDER_DEPTHS = {
-  environment: 2,
-  building: 3,
-} as const;
+import { SCENE_RENDER_DEPTHS } from './render-depths';
 
 export interface StaticDecorationRenderItem {
   readonly id: string;
@@ -31,7 +27,7 @@ export const getVillageRenderItems = (): readonly StaticDecorationRenderItem[] =
       textureKey: asset.id,
       position: decoration.position,
       origin: asset.anchor,
-      depth: VILLAGE_RENDER_DEPTHS.environment,
+      depth: SCENE_RENDER_DEPTHS.environment,
     };
   }),
   ...VILLAGE_BUILDINGS.map((building) => {
@@ -41,7 +37,7 @@ export const getVillageRenderItems = (): readonly StaticDecorationRenderItem[] =
       textureKey: asset.id,
       position: building.position,
       origin: asset.anchor,
-      depth: VILLAGE_RENDER_DEPTHS.building,
+      depth: SCENE_RENDER_DEPTHS.buildings,
     };
   }),
 ];

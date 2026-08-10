@@ -29,10 +29,9 @@ import {
   recordInteractionInput,
 } from './game/interaction-input';
 import { createDialoguePanel } from './game/dialogue-panel';
-import {
-  getRoadRectangles,
-  ROAD_CAMERA_SETTINGS,
-} from './game/road-map-presentation';
+import { ROAD_CAMERA_SETTINGS } from './game/road-map-presentation';
+import { getOutdoorMapRenderPlan } from './game/outdoor-slice-presentation';
+import { SCENE_RENDER_DEPTHS } from './game/render-depths';
 import {
   advancePlayerPresentation,
   createPlayerPresentationState,
@@ -55,7 +54,6 @@ import {
   RUNTIME_DECORATION_ASSETS,
 } from './game/runtime-assets';
 import { RUNTIME_DECORATION_URLS } from './game/runtime-decoration-urls';
-import { getVillageRenderItems } from './game/village-presentation';
 import { GAME_HEIGHT, GAME_WIDTH } from './shared/game-config';
 
 const GRASS_COLOR = 0x70c52b;
@@ -141,7 +139,7 @@ class PlayerScene extends Scene {
         NPC_SHADOW_COLOR,
         NPC_SHADOW_ALPHA,
       )
-      .setDepth(2);
+      .setDepth(SCENE_RENDER_DEPTHS.shadows);
 
     const initialLeahSpritePosition = getNpcSpritePosition(LEAH.position);
     this.leah = this.add
@@ -151,7 +149,7 @@ class PlayerScene extends Scene {
         NPC_LEAH_TEXTURE_KEY,
       )
       .setOrigin(0.5)
-      .setDepth(3);
+      .setDepth(SCENE_RENDER_DEPTHS.characters);
 
     const initialLeahPromptPosition = getLeahPromptPosition(LEAH.position);
     this.leahPromptBackground = this.add
@@ -164,7 +162,7 @@ class PlayerScene extends Scene {
         0.9,
       )
       .setStrokeStyle(2, 0xffffff, 1)
-      .setDepth(4)
+      .setDepth(SCENE_RENDER_DEPTHS.promptBackground)
       .setVisible(false);
 
     this.leahPrompt = this.add
@@ -175,7 +173,7 @@ class PlayerScene extends Scene {
         fontStyle: 'bold',
       })
       .setOrigin(0.5)
-      .setDepth(5)
+      .setDepth(SCENE_RENDER_DEPTHS.prompt)
       .setVisible(false);
 
     const initialPosition = this.worldState.player.position;
@@ -190,7 +188,7 @@ class PlayerScene extends Scene {
         PLAYER_SHADOW_COLOR,
         PLAYER_SHADOW_ALPHA,
       )
-      .setDepth(1);
+      .setDepth(SCENE_RENDER_DEPTHS.shadows);
 
     this.player = this.add
       .sprite(
@@ -200,7 +198,7 @@ class PlayerScene extends Scene {
         0,
       )
       .setOrigin(0.5)
-      .setDepth(3);
+      .setDepth(SCENE_RENDER_DEPTHS.characters);
 
     this.cameras.main.setBounds(
       0,
@@ -238,7 +236,7 @@ class PlayerScene extends Scene {
         fontSize: '16px',
       })
       .setScrollFactor(0)
-      .setDepth(10);
+      .setDepth(SCENE_RENDER_DEPTHS.hud);
   }
 
   public update(_time: number, delta: number): void {
@@ -260,19 +258,19 @@ class PlayerScene extends Scene {
   }
 
   private drawMap(): void {
+    const renderPlan = getOutdoorMapRenderPlan(ROAD_MAP);
     this.add
       .tileSprite(
-        0,
-        0,
-        ROAD_MAP.worldWidth,
-        ROAD_MAP.worldHeight,
+        renderPlan.ground.x,
+        renderPlan.ground.y,
+        renderPlan.ground.width,
+        renderPlan.ground.height,
         GRASS_TEXTURE_KEY,
       )
       .setOrigin(0)
-      .setDepth(0);
+      .setDepth(renderPlan.ground.depth);
 
-    const roadRectangles = getRoadRectangles(ROAD_MAP);
-    for (const rectangle of roadRectangles) {
+    for (const rectangle of renderPlan.roads) {
       this.add
         .tileSprite(
           rectangle.x,
@@ -282,10 +280,10 @@ class PlayerScene extends Scene {
           ROAD_TEXTURE_KEY,
         )
         .setOrigin(0)
-        .setDepth(1);
+        .setDepth(rectangle.depth);
     }
 
-    for (const item of getVillageRenderItems()) {
+    for (const item of renderPlan.staticObjects) {
       this.add
         .image(
           item.position.x,
