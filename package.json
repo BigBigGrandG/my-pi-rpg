@@ -9,6 +9,7 @@
     "node": ">=24 <25"
   },
   "scripts": {
+    "assets:normalize": "node --experimental-strip-types scripts/normalize-game-assets.ts",
     "dev": "electron-forge start",
     "start": "electron-forge start",
     "typecheck": "tsc --noEmit",
@@ -26,11 +27,13 @@
     "@electron-forge/plugin-vite": "^7.11.2",
     "@electron/fuses": "^1.8.0",
     "@types/node": "^22.15.0",
+    "@types/pngjs": "^6.0.4",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "electron": "43.3.0",
     "eslint": "^8.57.1",
     "eslint-plugin-import": "^2.32.0",
+    "pngjs": "^7.0.0",
     "typescript": "^6.0.2",
     "vite": "^5.4.21",
     "vitest": "^2.1.9"

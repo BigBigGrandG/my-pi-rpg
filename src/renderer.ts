@@ -1,5 +1,8 @@
 import { AUTO, Core, Game, Input, Scene, Types } from 'phaser';
 import './index.css';
+import grassTileUrl from '../assets/game/runtime/grass-spring-tile.png';
+import playerSheetUrl from '../assets/game/runtime/player-male-sheet.png';
+import roadTileUrl from '../assets/game/runtime/road-dirt-tile.png';
 import {
   advanceWorld,
   createWorldState,
@@ -18,12 +21,24 @@ import {
   getRoadRectangles,
   ROAD_CAMERA_SETTINGS,
 } from './game/road-map-presentation';
-import { GAME_HEIGHT, GAME_WIDTH, PLAYER_SIZE } from './shared/game-config';
+import {
+  advancePlayerPresentation,
+  createPlayerPresentationState,
+  getPlayerPresentationFrame,
+  getPlayerShadowPosition,
+  getPlayerSpritePosition,
+  PLAYER_SHADOW_HEIGHT,
+  PLAYER_SHADOW_WIDTH,
+} from './game/player-presentation';
+import { RUNTIME_ASSETS } from './game/runtime-assets';
+import { GAME_HEIGHT, GAME_WIDTH } from './shared/game-config';
 
-const GRASS_COLOR = 0x79aa5c;
-const ROAD_COLOR = 0xb98655;
-const ROAD_EDGE_COLOR = 0x9d6d45;
-const PLAYER_COLOR = 0x4285f4;
+const GRASS_COLOR = 0x70c52b;
+const GRASS_TEXTURE_KEY = RUNTIME_ASSETS.grass.id;
+const ROAD_TEXTURE_KEY = RUNTIME_ASSETS.road.id;
+const PLAYER_TEXTURE_KEY = RUNTIME_ASSETS.player.id;
+const PLAYER_SHADOW_COLOR = 0x10200f;
+const PLAYER_SHADOW_ALPHA = 0.35;
 
 type Direction = FacingDirection;
 type DirectionKey = { isDown: boolean };
@@ -32,32 +47,62 @@ type PlayerView = {
   readonly x: number;
   readonly y: number;
   setPosition: (x: number, y: number) => void;
+  setFrame: (frame: number) => void;
+};
+
+type PlayerShadowView = {
+  setPosition: (x: number, y: number) => void;
 };
 
 class PlayerScene extends Scene {
   private player: PlayerView | null = null;
+  private playerShadow: PlayerShadowView | null = null;
   private worldState: WorldState = createWorldState(ROAD_MAP.playerSpawn);
   private cursorKeys: DirectionKeys | null = null;
   private wasdKeys: DirectionKeys | null = null;
   private inputHistory: InputHistory = createInputHistory();
+  private playerPresentation = createPlayerPresentationState();
 
   public constructor() {
     super('player-scene');
+  }
+
+  public preload(): void {
+    this.load.image(GRASS_TEXTURE_KEY, grassTileUrl);
+    this.load.image(ROAD_TEXTURE_KEY, roadTileUrl);
+    this.load.spritesheet(PLAYER_TEXTURE_KEY, playerSheetUrl, {
+      frameWidth: RUNTIME_ASSETS.player.frameWidth,
+      frameHeight: RUNTIME_ASSETS.player.frameHeight,
+    });
   }
 
   public create(): void {
     this.cameras.main.setBackgroundColor(GRASS_COLOR);
     this.drawMap();
 
-    this.player = this.add
-      .rectangle(
-        this.worldState.player.position.x,
-        this.worldState.player.position.y,
-        PLAYER_SIZE,
-        PLAYER_SIZE,
-        PLAYER_COLOR,
+    const initialPosition = this.worldState.player.position;
+    const initialSpritePosition = getPlayerSpritePosition(initialPosition);
+    const initialShadowPosition = getPlayerShadowPosition(initialPosition);
+    this.playerShadow = this.add
+      .ellipse(
+        initialShadowPosition.x,
+        initialShadowPosition.y,
+        PLAYER_SHADOW_WIDTH,
+        PLAYER_SHADOW_HEIGHT,
+        PLAYER_SHADOW_COLOR,
+        PLAYER_SHADOW_ALPHA,
       )
-      .setOrigin(0.5);
+      .setDepth(1);
+
+    this.player = this.add
+      .sprite(
+        initialSpritePosition.x,
+        initialSpritePosition.y,
+        PLAYER_TEXTURE_KEY,
+        0,
+      )
+      .setOrigin(0.5)
+      .setDepth(2);
 
     this.cameras.main.setBounds(
       0,
@@ -93,7 +138,8 @@ class PlayerScene extends Scene {
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: '16px',
       })
-      .setScrollFactor(0);
+      .setScrollFactor(0)
+      .setDepth(10);
   }
 
   public update(_time: number, delta: number): void {
@@ -107,35 +153,56 @@ class PlayerScene extends Scene {
       delta / 1000,
       ROAD_WORLD_RULES,
     );
-    const { position } = this.worldState.player;
-    this.player.setPosition(position.x, position.y);
+    this.updatePlayerPresentation(delta);
   }
 
   private drawMap(): void {
-    const map = this.add.graphics();
-    map.fillStyle(GRASS_COLOR, 1);
-    map.fillRect(0, 0, ROAD_MAP.worldWidth, ROAD_MAP.worldHeight);
-    map.fillStyle(ROAD_COLOR, 1);
+    this.add
+      .tileSprite(
+        0,
+        0,
+        ROAD_MAP.worldWidth,
+        ROAD_MAP.worldHeight,
+        GRASS_TEXTURE_KEY,
+      )
+      .setOrigin(0)
+      .setDepth(0);
 
     const roadRectangles = getRoadRectangles(ROAD_MAP);
     for (const rectangle of roadRectangles) {
-      map.fillRect(
-        rectangle.x,
-        rectangle.y,
-        rectangle.width,
-        rectangle.height,
-      );
+      this.add
+        .tileSprite(
+          rectangle.x,
+          rectangle.y,
+          rectangle.width,
+          rectangle.height,
+          ROAD_TEXTURE_KEY,
+        )
+        .setOrigin(0)
+        .setDepth(1);
+    }
+  }
+
+  private updatePlayerPresentation(delta: number): void {
+    if (!this.player || !this.playerShadow) {
+      return;
     }
 
-    map.lineStyle(2, ROAD_EDGE_COLOR, 0.8);
-    for (const rectangle of roadRectangles) {
-      map.strokeRect(
-        rectangle.x,
-        rectangle.y,
-        rectangle.width,
-        rectangle.height,
-      );
-    }
+    const { facing, isMoving } = this.worldState.player;
+    this.playerPresentation = advancePlayerPresentation(
+      this.playerPresentation,
+      { facing, isMoving },
+      delta,
+    );
+    this.player.setFrame(
+      getPlayerPresentationFrame(this.playerPresentation),
+    );
+
+    const { position } = this.worldState.player;
+    const spritePosition = getPlayerSpritePosition(position);
+    const shadowPosition = getPlayerShadowPosition(position);
+    this.player.setPosition(spritePosition.x, spritePosition.y);
+    this.playerShadow.setPosition(shadowPosition.x, shadowPosition.y);
   }
 
   private readMovementInput(): InputSnapshot {

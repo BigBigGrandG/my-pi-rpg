@@ -8,6 +8,7 @@
     "sourceMap": true,
     "outDir": "dist",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true,
     "types": ["node"],
@@ -17,6 +18,7 @@
   },
   "include": [
     "src/**/*.ts",
+    "scripts/**/*.ts",
     "forge.config.ts",
     "forge.env.d.ts",
     "vite.*.config.ts"
