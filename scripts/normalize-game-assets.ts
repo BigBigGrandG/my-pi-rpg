@@ -2,7 +2,10 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
-import { RUNTIME_ASSETS } from '../src/game/runtime-assets.ts';
+import {
+  RUNTIME_ASSETS,
+  RUNTIME_DECORATION_ASSETS,
+} from '../src/game/runtime-assets.ts';
 
 type RgbColor = [number, number, number];
 type PngImage = PNG;
@@ -19,6 +22,7 @@ const playerFrameHeight = RUNTIME_ASSETS.player.frameHeight;
 const npcSpriteWidth = RUNTIME_ASSETS.leah.width;
 const npcSpriteHeight = RUNTIME_ASSETS.leah.height;
 export const PLAYER_ALPHA_THRESHOLD = 240;
+export const DECORATION_ALPHA_THRESHOLD = 240;
 
 const readPng = (relativePath: string): PngImage =>
   PNG.sync.read(readFileSync(resolve(projectRoot, relativePath)));
@@ -261,6 +265,82 @@ export const normalizeNpcSprite = (source: PngImage): PngImage => {
   return target;
 };
 
+const findTransparentBounds = (
+  source: PngImage,
+  alphaThreshold: number,
+): PixelBounds => {
+  let left = source.width;
+  let top = source.height;
+  let right = -1;
+  let bottom = -1;
+
+  for (let y = 0; y < source.height; y += 1) {
+    for (let x = 0; x < source.width; x += 1) {
+      const alpha = source.data[(y * source.width + x) * 4 + 3];
+      if (alpha < alphaThreshold) {
+        continue;
+      }
+
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x);
+      bottom = Math.max(bottom, y);
+    }
+  }
+
+  if (right < left || bottom < top) {
+    throw new Error('Transparent source must contain opaque artwork.');
+  }
+
+  return { left, top, right, bottom };
+};
+
+export const normalizeTransparentAsset = (
+  source: PngImage,
+  targetWidth: number,
+  targetHeight: number,
+  alphaThreshold: number = DECORATION_ALPHA_THRESHOLD,
+): PngImage => {
+  const bounds = findTransparentBounds(source, alphaThreshold);
+  const sourceWidth = bounds.right - bounds.left + 1;
+  const sourceHeight = bounds.bottom - bounds.top + 1;
+  const scale = Math.min(
+    targetWidth / sourceWidth,
+    targetHeight / sourceHeight,
+  );
+  const scaledWidth = Math.max(1, Math.floor(sourceWidth * scale));
+  const scaledHeight = Math.max(1, Math.floor(sourceHeight * scale));
+  const target = new PNG({ width: targetWidth, height: targetHeight });
+  target.data.fill(0);
+  const offsetX = Math.floor((targetWidth - scaledWidth) / 2);
+  const offsetY = targetHeight - scaledHeight;
+
+  for (let y = 0; y < scaledHeight; y += 1) {
+    for (let x = 0; x < scaledWidth; x += 1) {
+      const sourceX = bounds.left + Math.min(
+        sourceWidth - 1,
+        Math.floor(((x + 0.5) * sourceWidth) / scaledWidth),
+      );
+      const sourceY = bounds.top + Math.min(
+        sourceHeight - 1,
+        Math.floor(((y + 0.5) * sourceHeight) / scaledHeight),
+      );
+      const sourceOffset = (sourceY * source.width + sourceX) * 4;
+      if (source.data[sourceOffset + 3] < alphaThreshold) {
+        continue;
+      }
+
+      const targetOffset = ((offsetY + y) * target.width + offsetX + x) * 4;
+      target.data[targetOffset] = source.data[sourceOffset];
+      target.data[targetOffset + 1] = source.data[sourceOffset + 1];
+      target.data[targetOffset + 2] = source.data[sourceOffset + 2];
+      target.data[targetOffset + 3] = 255;
+    }
+  }
+
+  return target;
+};
+
 export const normalizeGameAssets = (): void => {
   const grassSource = readPng('assets/game/terrain/grass-spring.png');
   const roadSource = readPng('assets/game/terrain/road-dirt.png');
@@ -283,6 +363,21 @@ export const normalizeGameAssets = (): void => {
     'assets/game/runtime/npc-leah.png',
     normalizeNpcSprite(leahSource),
   );
+
+  for (const asset of Object.values(RUNTIME_DECORATION_ASSETS.buildings)) {
+    const source = readPng(asset.sourcePath);
+    writePng(
+      asset.path,
+      normalizeTransparentAsset(source, asset.width, asset.height),
+    );
+  }
+  for (const asset of Object.values(RUNTIME_DECORATION_ASSETS.environment)) {
+    const source = readPng(asset.sourcePath);
+    writePng(
+      asset.path,
+      normalizeTransparentAsset(source, asset.width, asset.height),
+    );
+  }
 };
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

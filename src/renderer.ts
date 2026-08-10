@@ -5,6 +5,10 @@ import npcLeahUrl from '../assets/game/runtime/npc-leah.png';
 import playerSheetUrl from '../assets/game/runtime/player-male-sheet.png';
 import roadTileUrl from '../assets/game/runtime/road-dirt-tile.png';
 import {
+  BUILDING_IDS,
+  ENVIRONMENT_ASSET_IDS,
+} from './domain/village-layout';
+import {
   advanceWorld,
   createWorldState,
   type FacingDirection,
@@ -39,7 +43,12 @@ import {
   NPC_SHADOW_WIDTH,
   shouldShowLeahPrompt,
 } from './game/npc-presentation';
-import { RUNTIME_ASSETS } from './game/runtime-assets';
+import {
+  RUNTIME_ASSETS,
+  RUNTIME_DECORATION_ASSETS,
+} from './game/runtime-assets';
+import { RUNTIME_DECORATION_URLS } from './game/runtime-decoration-urls';
+import { getVillageRenderItems } from './game/village-presentation';
 import { GAME_HEIGHT, GAME_WIDTH } from './shared/game-config';
 
 const GRASS_COLOR = 0x70c52b;
@@ -96,6 +105,15 @@ class PlayerScene extends Scene {
       frameWidth: RUNTIME_ASSETS.player.frameWidth,
       frameHeight: RUNTIME_ASSETS.player.frameHeight,
     });
+
+    for (const assetId of BUILDING_IDS) {
+      const asset = RUNTIME_DECORATION_ASSETS.buildings[assetId];
+      this.load.image(asset.id, RUNTIME_DECORATION_URLS.buildings[assetId]);
+    }
+    for (const assetId of ENVIRONMENT_ASSET_IDS) {
+      const asset = RUNTIME_DECORATION_ASSETS.environment[assetId];
+      this.load.image(asset.id, RUNTIME_DECORATION_URLS.environment[assetId]);
+    }
   }
 
   public create(): void {
@@ -250,6 +268,17 @@ class PlayerScene extends Scene {
         )
         .setOrigin(0)
         .setDepth(1);
+    }
+
+    for (const item of getVillageRenderItems()) {
+      this.add
+        .image(
+          item.position.x,
+          item.position.y,
+          item.textureKey,
+        )
+        .setOrigin(item.origin.x, item.origin.y)
+        .setDepth(item.depth);
     }
   }
 

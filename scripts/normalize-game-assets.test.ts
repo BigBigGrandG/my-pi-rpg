@@ -3,9 +3,11 @@ import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import {
+  DECORATION_ALPHA_THRESHOLD,
   normalizeNpcSprite,
   normalizePlayerSheet,
   normalizeTerrainTile,
+  normalizeTransparentAsset,
   PLAYER_ALPHA_THRESHOLD,
 } from './normalize-game-assets';
 
@@ -106,5 +108,36 @@ describe('asset normalizer', () => {
 
     expect(sprite.data[(24 * sprite.width + 8) * 4 + 3]).toBe(0);
     expect(sprite.data[(24 * sprite.width + 16) * 4 + 3]).toBe(255);
+  });
+
+  it('fits transparent artwork to a bottom-centered runtime canvas', () => {
+    const source = new PNG({ width: 4, height: 4 });
+    for (let y = 1; y < 3; y += 1) {
+      for (let x = 1; x < 3; x += 1) {
+        const offset = (y * source.width + x) * 4;
+        source.data[offset] = 240;
+        source.data[offset + 1] = 160;
+        source.data[offset + 2] = 80;
+        source.data[offset + 3] = 255;
+      }
+    }
+    source.data[3] = DECORATION_ALPHA_THRESHOLD - 1;
+
+    const image = normalizeTransparentAsset(source, 8, 10);
+
+    expect([image.width, image.height]).toEqual([8, 10]);
+    expect(new Set(
+      Array.from({ length: image.width * image.height }, (_, index) =>
+        image.data[index * 4 + 3],
+      ),
+    )).toEqual(new Set([0, 255]));
+    expect(image.data[(9 * image.width + 3) * 4 + 3]).toBe(255);
+    expect(image.data[3]).toBe(0);
+  });
+
+  it('rejects transparent sources without visible artwork', () => {
+    expect(() => normalizeTransparentAsset(new PNG({ width: 4, height: 4 }), 8, 8)).toThrow(
+      'Transparent source must contain opaque artwork.',
+    );
   });
 });
