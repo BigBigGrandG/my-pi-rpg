@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 import {
+  normalizeNpcSprite,
   normalizePlayerSheet,
   normalizeTerrainTile,
   PLAYER_ALPHA_THRESHOLD,
@@ -58,5 +59,52 @@ describe('asset normalizer', () => {
     expect(() => normalizePlayerSheet(new PNG({ width: 128, height: 192 }))).toThrow(
       'Player source must be 1024 by 1536 pixels.',
     );
+  });
+
+  it('normalizes Leah to a transparent, bottom-centered 32 by 48 sprite', () => {
+    const sprite = normalizeNpcSprite(
+      readAsset('assets/game/characters/npc-leah.png'),
+    );
+    let minX = sprite.width;
+    let maxX = -1;
+    let minY = sprite.height;
+    let maxY = -1;
+
+    for (let y = 0; y < sprite.height; y += 1) {
+      for (let x = 0; x < sprite.width; x += 1) {
+        if (sprite.data[(y * sprite.width + x) * 4 + 3] !== 255) {
+          continue;
+        }
+
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+
+    expect([sprite.width, sprite.height]).toEqual([32, 48]);
+    expect(sprite.data[3]).toBe(0);
+    expect(minX).toBeGreaterThan(0);
+    expect(maxX).toBeLessThan(sprite.width - 1);
+    expect(Math.abs((minX + maxX) / 2 - (sprite.width - 1) / 2)).toBeLessThanOrEqual(1);
+    expect(minY).toBeGreaterThanOrEqual(0);
+    expect(maxY).toBe(sprite.height - 1);
+  });
+
+  it('preserves transparent holes inside Leah’s trimmed artwork', () => {
+    const source = new PNG({ width: 4, height: 4 });
+    source.data.fill(255);
+    for (let index = 0; index < source.width * source.height; index += 1) {
+      source.data[index * 4] = 200;
+      source.data[index * 4 + 1] = 120;
+      source.data[index * 4 + 2] = 60;
+    }
+    source.data[(1 * source.width + 1) * 4 + 3] = 0;
+
+    const sprite = normalizeNpcSprite(source);
+
+    expect(sprite.data[(24 * sprite.width + 8) * 4 + 3]).toBe(0);
+    expect(sprite.data[(24 * sprite.width + 16) * 4 + 3]).toBe(255);
   });
 });

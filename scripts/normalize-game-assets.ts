@@ -16,6 +16,8 @@ const playerSourceFrameWidth = RUNTIME_ASSETS.player.sourceWidth / playerColumns
 const playerSourceFrameHeight = RUNTIME_ASSETS.player.sourceHeight / playerRows;
 const playerFrameWidth = RUNTIME_ASSETS.player.frameWidth;
 const playerFrameHeight = RUNTIME_ASSETS.player.frameHeight;
+const npcSpriteWidth = RUNTIME_ASSETS.leah.width;
+const npcSpriteHeight = RUNTIME_ASSETS.leah.height;
 export const PLAYER_ALPHA_THRESHOLD = 240;
 
 const readPng = (relativePath: string): PngImage =>
@@ -185,10 +187,85 @@ export const normalizePlayerSheet = (source: PngImage): PngImage => {
   return sheet;
 };
 
+interface PixelBounds {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
+}
+
+const findOpaqueBounds = (source: PngImage): PixelBounds => {
+  let left = source.width;
+  let top = source.height;
+  let right = -1;
+  let bottom = -1;
+
+  for (let y = 0; y < source.height; y += 1) {
+    for (let x = 0; x < source.width; x += 1) {
+      const alpha = source.data[(y * source.width + x) * 4 + 3];
+      if (alpha < PLAYER_ALPHA_THRESHOLD) {
+        continue;
+      }
+
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x);
+      bottom = Math.max(bottom, y);
+    }
+  }
+
+  if (right < left || bottom < top) {
+    throw new Error('NPC source must contain opaque artwork.');
+  }
+
+  return { left, top, right, bottom };
+};
+
+export const normalizeNpcSprite = (source: PngImage): PngImage => {
+  const bounds = findOpaqueBounds(source);
+  const sourceWidth = bounds.right - bounds.left + 1;
+  const sourceHeight = bounds.bottom - bounds.top + 1;
+  const scale = Math.min(
+    npcSpriteWidth / sourceWidth,
+    npcSpriteHeight / sourceHeight,
+  );
+  const scaledWidth = Math.max(1, Math.round(sourceWidth * scale));
+  const scaledHeight = Math.max(1, Math.round(sourceHeight * scale));
+  const target = new PNG({ width: npcSpriteWidth, height: npcSpriteHeight });
+  const offsetX = Math.floor((npcSpriteWidth - scaledWidth) / 2);
+  const offsetY = npcSpriteHeight - scaledHeight;
+
+  for (let y = 0; y < scaledHeight; y += 1) {
+    for (let x = 0; x < scaledWidth; x += 1) {
+      const sourceX = bounds.left + Math.min(
+        sourceWidth - 1,
+        Math.floor((x * sourceWidth) / scaledWidth),
+      );
+      const sourceY = bounds.top + Math.min(
+        sourceHeight - 1,
+        Math.floor((y * sourceHeight) / scaledHeight),
+      );
+      const sourceOffset = (sourceY * source.width + sourceX) * 4;
+      if (source.data[sourceOffset + 3] < PLAYER_ALPHA_THRESHOLD) {
+        continue;
+      }
+      const targetOffset = ((offsetY + y) * target.width + offsetX + x) * 4;
+
+      target.data[targetOffset] = source.data[sourceOffset];
+      target.data[targetOffset + 1] = source.data[sourceOffset + 1];
+      target.data[targetOffset + 2] = source.data[sourceOffset + 2];
+      target.data[targetOffset + 3] = 255;
+    }
+  }
+
+  return target;
+};
+
 export const normalizeGameAssets = (): void => {
   const grassSource = readPng('assets/game/terrain/grass-spring.png');
   const roadSource = readPng('assets/game/terrain/road-dirt.png');
   const playerSource = readPng('assets/game/characters/player-male.png');
+  const leahSource = readPng('assets/game/characters/npc-leah.png');
 
   writePng(
     'assets/game/runtime/grass-spring-tile.png',
@@ -201,6 +278,10 @@ export const normalizeGameAssets = (): void => {
   writePng(
     'assets/game/runtime/player-male-sheet.png',
     normalizePlayerSheet(playerSource),
+  );
+  writePng(
+    'assets/game/runtime/npc-leah.png',
+    normalizeNpcSprite(leahSource),
   );
 };
 

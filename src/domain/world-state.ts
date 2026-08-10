@@ -15,6 +15,16 @@ export interface InteractionState {
   readonly targetId: string | null;
 }
 
+export interface InteractionTarget {
+  readonly id: string;
+  readonly position: PlayerPosition;
+  readonly interactionDistance: number;
+}
+
+export interface InteractionRules {
+  readonly targets: readonly InteractionTarget[];
+}
+
 export interface DialogueState {
   readonly npcId: string | null;
 }
@@ -56,6 +66,7 @@ export interface WorldRules {
   readonly playerSpeed: number;
   readonly movementBounds: MovementBounds;
   readonly collision?: CollisionRules;
+  readonly interaction?: InteractionRules;
 }
 
 export const PLAYER_SPEED = 160;
@@ -104,15 +115,68 @@ export const advanceWorld = (
           rules,
         );
 
+  const nextPlayer: PlayerState = {
+    ...state.player,
+    position: nextPosition,
+    facing,
+    isMoving: hasPositionChanged(state.player.position, nextPosition),
+  };
+
   return {
     ...state,
-    player: {
-      ...state.player,
-      position: nextPosition,
-      facing,
-      isMoving: hasPositionChanged(state.player.position, nextPosition),
-    },
+    player: nextPlayer,
+    interaction: rules.interaction
+      ? {
+          targetId: resolveInteractionTarget(
+            nextPlayer,
+            state.dialogue.npcId,
+            rules.interaction,
+          ),
+        }
+      : state.interaction,
   };
+};
+
+const resolveInteractionTarget = (
+  player: PlayerState,
+  dialogueNpcId: string | null,
+  rules: InteractionRules,
+): string | null => {
+  if (dialogueNpcId !== null) {
+    return null;
+  }
+
+  return rules.targets.find((target) => {
+    const distance = Math.hypot(
+      target.position.x - player.position.x,
+      target.position.y - player.position.y,
+    );
+
+    return (
+      distance <= target.interactionDistance &&
+      isFacingTarget(player.position, player.facing, target.position)
+    );
+  })?.id ?? null;
+};
+
+const isFacingTarget = (
+  playerPosition: PlayerPosition,
+  facing: FacingDirection,
+  targetPosition: PlayerPosition,
+): boolean => {
+  const offsetX = targetPosition.x - playerPosition.x;
+  const offsetY = targetPosition.y - playerPosition.y;
+
+  switch (facing) {
+    case 'up':
+      return offsetY < 0;
+    case 'down':
+      return offsetY > 0;
+    case 'left':
+      return offsetX < 0;
+    case 'right':
+      return offsetX > 0;
+  }
 };
 
 const resolveFacing = (

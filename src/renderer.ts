@@ -1,6 +1,7 @@
 import { AUTO, Core, Game, Input, Scene, Types } from 'phaser';
 import './index.css';
 import grassTileUrl from '../assets/game/runtime/grass-spring-tile.png';
+import npcLeahUrl from '../assets/game/runtime/npc-leah.png';
 import playerSheetUrl from '../assets/game/runtime/player-male-sheet.png';
 import roadTileUrl from '../assets/game/runtime/road-dirt-tile.png';
 import {
@@ -10,7 +11,7 @@ import {
   type InputSnapshot,
   type WorldState,
 } from './domain/world-state';
-import { ROAD_MAP, ROAD_WORLD_RULES } from './domain/road-map';
+import { LEAH, ROAD_MAP, ROAD_WORLD_RULES } from './domain/road-map';
 import {
   createInputHistory,
   recordInput,
@@ -30,6 +31,14 @@ import {
   PLAYER_SHADOW_HEIGHT,
   PLAYER_SHADOW_WIDTH,
 } from './game/player-presentation';
+import {
+  getLeahPromptPosition,
+  getNpcShadowPosition,
+  getNpcSpritePosition,
+  NPC_SHADOW_HEIGHT,
+  NPC_SHADOW_WIDTH,
+  shouldShowLeahPrompt,
+} from './game/npc-presentation';
 import { RUNTIME_ASSETS } from './game/runtime-assets';
 import { GAME_HEIGHT, GAME_WIDTH } from './shared/game-config';
 
@@ -37,8 +46,11 @@ const GRASS_COLOR = 0x70c52b;
 const GRASS_TEXTURE_KEY = RUNTIME_ASSETS.grass.id;
 const ROAD_TEXTURE_KEY = RUNTIME_ASSETS.road.id;
 const PLAYER_TEXTURE_KEY = RUNTIME_ASSETS.player.id;
+const NPC_LEAH_TEXTURE_KEY = RUNTIME_ASSETS.leah.id;
 const PLAYER_SHADOW_COLOR = 0x10200f;
 const PLAYER_SHADOW_ALPHA = 0.35;
+const NPC_SHADOW_COLOR = 0x10200f;
+const NPC_SHADOW_ALPHA = 0.35;
 
 type Direction = FacingDirection;
 type DirectionKey = { isDown: boolean };
@@ -54,9 +66,18 @@ type PlayerShadowView = {
   setPosition: (x: number, y: number) => void;
 };
 
+type NpcPromptView = {
+  setPosition: (x: number, y: number) => void;
+  setVisible: (visible: boolean) => void;
+};
+
 class PlayerScene extends Scene {
   private player: PlayerView | null = null;
   private playerShadow: PlayerShadowView | null = null;
+  private leah: PlayerView | null = null;
+  private leahShadow: PlayerShadowView | null = null;
+  private leahPromptBackground: NpcPromptView | null = null;
+  private leahPrompt: NpcPromptView | null = null;
   private worldState: WorldState = createWorldState(ROAD_MAP.playerSpawn);
   private cursorKeys: DirectionKeys | null = null;
   private wasdKeys: DirectionKeys | null = null;
@@ -70,6 +91,7 @@ class PlayerScene extends Scene {
   public preload(): void {
     this.load.image(GRASS_TEXTURE_KEY, grassTileUrl);
     this.load.image(ROAD_TEXTURE_KEY, roadTileUrl);
+    this.load.image(NPC_LEAH_TEXTURE_KEY, npcLeahUrl);
     this.load.spritesheet(PLAYER_TEXTURE_KEY, playerSheetUrl, {
       frameWidth: RUNTIME_ASSETS.player.frameWidth,
       frameHeight: RUNTIME_ASSETS.player.frameHeight,
@@ -79,6 +101,53 @@ class PlayerScene extends Scene {
   public create(): void {
     this.cameras.main.setBackgroundColor(GRASS_COLOR);
     this.drawMap();
+
+    const initialLeahShadowPosition = getNpcShadowPosition(LEAH.position);
+    this.leahShadow = this.add
+      .ellipse(
+        initialLeahShadowPosition.x,
+        initialLeahShadowPosition.y,
+        NPC_SHADOW_WIDTH,
+        NPC_SHADOW_HEIGHT,
+        NPC_SHADOW_COLOR,
+        NPC_SHADOW_ALPHA,
+      )
+      .setDepth(2);
+
+    const initialLeahSpritePosition = getNpcSpritePosition(LEAH.position);
+    this.leah = this.add
+      .sprite(
+        initialLeahSpritePosition.x,
+        initialLeahSpritePosition.y,
+        NPC_LEAH_TEXTURE_KEY,
+      )
+      .setOrigin(0.5)
+      .setDepth(3);
+
+    const initialLeahPromptPosition = getLeahPromptPosition(LEAH.position);
+    this.leahPromptBackground = this.add
+      .rectangle(
+        initialLeahPromptPosition.x,
+        initialLeahPromptPosition.y,
+        28,
+        26,
+        0x26331d,
+        0.9,
+      )
+      .setStrokeStyle(2, 0xffffff, 1)
+      .setDepth(4)
+      .setVisible(false);
+
+    this.leahPrompt = this.add
+      .text(initialLeahPromptPosition.x, initialLeahPromptPosition.y, 'J', {
+        color: '#ffffff',
+        fontFamily: 'Segoe UI, Microsoft YaHei, sans-serif',
+        fontSize: '16px',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(5)
+      .setVisible(false);
 
     const initialPosition = this.worldState.player.position;
     const initialSpritePosition = getPlayerSpritePosition(initialPosition);
@@ -102,7 +171,7 @@ class PlayerScene extends Scene {
         0,
       )
       .setOrigin(0.5)
-      .setDepth(2);
+      .setDepth(3);
 
     this.cameras.main.setBounds(
       0,
@@ -133,7 +202,7 @@ class PlayerScene extends Scene {
     this.events.once(Core.Events.DESTROY, this.handleDestroy, this);
 
     this.add
-      .text(16, 16, 'Move: Arrow Keys / WASD | Roads only', {
+      .text(16, 16, 'Move: Arrow Keys / WASD | Face Leah to see J', {
         color: '#ffffff',
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: '16px',
@@ -154,6 +223,7 @@ class PlayerScene extends Scene {
       ROAD_WORLD_RULES,
     );
     this.updatePlayerPresentation(delta);
+    this.updateLeahPresentation();
   }
 
   private drawMap(): void {
@@ -203,6 +273,28 @@ class PlayerScene extends Scene {
     const shadowPosition = getPlayerShadowPosition(position);
     this.player.setPosition(spritePosition.x, spritePosition.y);
     this.playerShadow.setPosition(shadowPosition.x, shadowPosition.y);
+  }
+
+  private updateLeahPresentation(): void {
+    if (
+      !this.leah ||
+      !this.leahShadow ||
+      !this.leahPromptBackground ||
+      !this.leahPrompt
+    ) {
+      return;
+    }
+
+    const spritePosition = getNpcSpritePosition(LEAH.position);
+    const shadowPosition = getNpcShadowPosition(LEAH.position);
+    const promptPosition = getLeahPromptPosition(LEAH.position);
+    const showPrompt = shouldShowLeahPrompt(this.worldState);
+    this.leah.setPosition(spritePosition.x, spritePosition.y);
+    this.leahShadow.setPosition(shadowPosition.x, shadowPosition.y);
+    this.leahPromptBackground.setPosition(promptPosition.x, promptPosition.y);
+    this.leahPrompt.setPosition(promptPosition.x, promptPosition.y);
+    this.leahPromptBackground.setVisible(showPrompt);
+    this.leahPrompt.setVisible(showPrompt);
   }
 
   private readMovementInput(): InputSnapshot {

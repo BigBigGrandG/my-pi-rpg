@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   isRoadWalkable,
+  LEAH,
+  LEAH_INTERACTION_DISTANCE,
   ROAD_MAP,
   ROAD_PLAYER_COLLIDER,
   ROAD_WORLD_RULES,
@@ -91,7 +93,7 @@ describe('ROAD_MAP', () => {
 
   it('keeps the player inside the world at road exits', () => {
     const rightEdge = advanceWorld(
-      createWorldState({ x: 600, y: 656 }),
+      createWorldState({ x: 600, y: 640 }),
       RIGHT_INPUT,
       20,
       ROAD_WORLD_RULES,
@@ -103,7 +105,7 @@ describe('ROAD_MAP', () => {
       ROAD_WORLD_RULES,
     );
 
-    expect(rightEdge.player.position).toEqual({ x: 1904, y: 656 });
+    expect(rightEdge.player.position).toEqual({ x: 1904, y: 640 });
     expect(topEdge.player.position).toEqual({ x: 368, y: 16 });
   });
 
@@ -118,5 +120,157 @@ describe('ROAD_MAP', () => {
     expect(next.player.position).toEqual({ x: 408, y: 400 });
     expect(next.player.facing).toBe('right');
     expect(next.player.isMoving).toBe(false);
+  });
+
+  it('places Leah east of the central intersection on the middle road', () => {
+    expect(LEAH.position).toEqual({ x: 1136, y: 656 });
+    expect(LEAH_INTERACTION_DISTANCE).toBe(48);
+    expect(isRoadWalkable(LEAH.position, LEAH.collider)).toBe(true);
+  });
+
+  it('shows Leah as the interaction target inside and at the distance threshold', () => {
+    for (const distance of [47, LEAH_INTERACTION_DISTANCE]) {
+      const position = {
+        x: LEAH.position.x - distance,
+        y: LEAH.position.y,
+      };
+      const state = createWorldState(position);
+      const next = advanceWorld(
+        {
+          ...state,
+          player: {
+            ...state.player,
+            position,
+            facing: 'right',
+          },
+        },
+        { up: false, down: false, left: false, right: false },
+        0,
+        ROAD_WORLD_RULES,
+      );
+
+      expect(next.interaction.targetId).toBe('leah');
+    }
+  });
+
+  it('hides Leah as the interaction target outside the distance threshold', () => {
+    const distance = LEAH_INTERACTION_DISTANCE + 1;
+    const position = {
+      x: LEAH.position.x - distance,
+      y: LEAH.position.y,
+    };
+    const state = createWorldState(position);
+
+    const next = advanceWorld(
+      {
+        ...state,
+        player: {
+          ...state.player,
+          facing: 'right',
+        },
+      },
+      { up: false, down: false, left: false, right: false },
+      0,
+      ROAD_WORLD_RULES,
+    );
+
+    expect(next.interaction.targetId).toBeNull();
+  });
+
+  it('accepts every cardinal approach and rejects a backward-facing approach', () => {
+    for (const approach of [
+      { position: { x: LEAH.position.x - 32, y: LEAH.position.y }, facing: 'right' },
+      { position: { x: LEAH.position.x + 32, y: LEAH.position.y }, facing: 'left' },
+      { position: { x: LEAH.position.x, y: LEAH.position.y - 32 }, facing: 'down' },
+      { position: { x: LEAH.position.x, y: LEAH.position.y + 32 }, facing: 'up' },
+    ] as const) {
+      const state = createWorldState(approach.position);
+      const next = advanceWorld(
+        {
+          ...state,
+          player: {
+            ...state.player,
+            facing: approach.facing,
+          },
+        },
+        { up: false, down: false, left: false, right: false },
+        0,
+        ROAD_WORLD_RULES,
+      );
+
+      expect(next.interaction.targetId).toBe('leah');
+    }
+
+    const state = createWorldState({
+      x: LEAH.position.x - 32,
+      y: LEAH.position.y,
+    });
+    const next = advanceWorld(
+      {
+        ...state,
+        player: {
+          ...state.player,
+          facing: 'left',
+        },
+      },
+      { up: false, down: false, left: false, right: false },
+      0,
+      ROAD_WORLD_RULES,
+    );
+
+    expect(next.interaction.targetId).toBeNull();
+  });
+
+  it('hides Leah while dialogue is open', () => {
+    const position = {
+      x: LEAH.position.x - 32,
+      y: LEAH.position.y,
+    };
+    const state = createWorldState(position);
+
+    const next = advanceWorld(
+      {
+        ...state,
+        player: {
+          ...state.player,
+          facing: 'right',
+        },
+        dialogue: {
+          npcId: 'leah',
+        },
+      },
+      { up: false, down: false, left: false, right: false },
+      0,
+      ROAD_WORLD_RULES,
+    );
+
+    expect(next.interaction.targetId).toBeNull();
+  });
+
+  it('blocks movement through Leah and keeps diagonal movement sliding on the free axis', () => {
+    const start = {
+      x: LEAH.position.x - 16,
+      y: LEAH.position.y,
+    };
+    const blocked = advanceWorld(
+      createWorldState(start),
+      { up: false, down: false, left: false, right: true },
+      10,
+      ROAD_WORLD_RULES,
+    );
+
+    expect(blocked.player.position.x).toBeCloseTo(start.x, 3);
+    expect(blocked.player.position.y).toBe(start.y);
+
+    const sliding = advanceWorld(
+      createWorldState(start),
+      { up: true, down: false, left: false, right: true },
+      0.1,
+      ROAD_WORLD_RULES,
+    );
+
+    expect(sliding.player.position.x).toBeCloseTo(start.x, 3);
+    expect(sliding.player.position.y).toBeLessThan(start.y);
+    expect(sliding.player.isMoving).toBe(true);
   });
 });

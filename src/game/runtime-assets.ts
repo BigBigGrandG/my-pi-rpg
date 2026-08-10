@@ -20,12 +20,14 @@ export interface RuntimeAssetManifest {
   readonly grass: RuntimeAssetContract;
   readonly road: RuntimeAssetContract;
   readonly player: RuntimePlayerAssetContract;
+  readonly leah: RuntimeAssetContract;
 }
 
 export const RUNTIME_ASSET_IDS = [
   'grass-spring',
   'road-dirt',
   'player-male',
+  'npc-leah',
 ] as const;
 
 export type RuntimeAssetId = (typeof RUNTIME_ASSET_IDS)[number];
@@ -62,5 +64,15 @@ export const RUNTIME_ASSETS: Readonly<RuntimeAssetManifest> = {
     opaque: false,
     frameWidth: 32,
     frameHeight: 48,
+  },
+  leah: {
+    id: 'npc-leah',
+    sourcePath: 'assets/game/characters/npc-leah.png',
+    path: 'assets/game/runtime/npc-leah.png',
+    sourceWidth: 1254,
+    sourceHeight: 1254,
+    width: 32,
+    height: 48,
+    opaque: false,
   },
 };

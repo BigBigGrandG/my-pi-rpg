@@ -1,6 +1,7 @@
 import {
   PLAYER_SPEED,
   type FootCollider,
+  type InteractionTarget,
   type MovementBounds,
   type PlayerPosition,
   type WorldRules,
@@ -57,6 +58,31 @@ export const ROAD_PLAYER_COLLIDER: FootCollider = {
   offsetY: 12,
 };
 
+export interface NpcDefinition extends InteractionTarget {
+  readonly collider: FootCollider;
+}
+
+export const LEAH_ID = 'leah';
+export const LEAH_INTERACTION_DISTANCE = 48;
+export const LEAH_COLLIDER: FootCollider = {
+  width: 16,
+  height: 8,
+  offsetX: 0,
+  offsetY: 12,
+};
+
+export const LEAH: NpcDefinition = {
+  id: LEAH_ID,
+  position: {
+    x: 35 * TILE_SIZE + TILE_SIZE / 2,
+    y: 20 * TILE_SIZE + TILE_SIZE / 2,
+  },
+  interactionDistance: LEAH_INTERACTION_DISTANCE,
+  collider: LEAH_COLLIDER,
+};
+
+export const ROAD_NPCS: readonly NpcDefinition[] = [LEAH];
+
 export const ROAD_MOVEMENT_BOUNDS: MovementBounds = {
   width: WORLD_WIDTH,
   height: WORLD_HEIGHT,
@@ -98,9 +124,46 @@ export const ROAD_WORLD_RULES: WorldRules = {
   collision: {
     collider: ROAD_PLAYER_COLLIDER,
     maxStep: TILE_SIZE / 2,
-    canOccupy: (position, collider) => isRoadWalkable(position, collider),
+    canOccupy: (position, collider) =>
+      isRoadWalkable(position, collider) && isNpcCollisionFree(position, collider),
+  },
+  interaction: {
+    targets: ROAD_NPCS,
   },
 };
+
+export const isNpcCollisionFree = (
+  position: PlayerPosition,
+  collider: FootCollider,
+  npcs: readonly NpcDefinition[] = ROAD_NPCS,
+): boolean => npcs.every((npc) => !collidersOverlap(position, collider, npc.position, npc.collider));
+
+const collidersOverlap = (
+  firstPosition: PlayerPosition,
+  firstCollider: FootCollider,
+  secondPosition: PlayerPosition,
+  secondCollider: FootCollider,
+): boolean => {
+  const first = getColliderBounds(firstPosition, firstCollider);
+  const second = getColliderBounds(secondPosition, secondCollider);
+
+  return (
+    first.left < second.right &&
+    first.right > second.left &&
+    first.top < second.bottom &&
+    first.bottom > second.top
+  );
+};
+
+const getColliderBounds = (
+  position: PlayerPosition,
+  collider: FootCollider,
+): { readonly left: number; readonly right: number; readonly top: number; readonly bottom: number } => ({
+  left: position.x + collider.offsetX - collider.width / 2,
+  right: position.x + collider.offsetX + collider.width / 2,
+  top: position.y + collider.offsetY - collider.height / 2,
+  bottom: position.y + collider.offsetY + collider.height / 2,
+});
 
 const isContainedInTileRange = (
   minimum: number,

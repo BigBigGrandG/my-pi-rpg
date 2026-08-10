@@ -26,7 +26,12 @@ const getPixel = (image: PNG, x: number, y: number): readonly number[] => {
 
 describe('runtime asset contracts', () => {
   it('publishes stable identities with separate source and runtime paths', () => {
-    expect(RUNTIME_ASSET_IDS).toEqual(['grass-spring', 'road-dirt', 'player-male']);
+    expect(RUNTIME_ASSET_IDS).toEqual([
+      'grass-spring',
+      'road-dirt',
+      'player-male',
+      'npc-leah',
+    ]);
     expect(Object.values(RUNTIME_ASSETS).map((asset) => asset.id)).toEqual(
       RUNTIME_ASSET_IDS,
     );
@@ -84,6 +89,18 @@ describe('runtime asset contracts', () => {
     );
     expect(alphaValues).toEqual(new Set([0, 255]));
     expect(image.data.some((_, index) => index % 4 === 3 && image.data[index] === 0)).toBe(true);
+    expect(image.data.some((_, index) => index % 4 === 3 && image.data[index] === 255)).toBe(true);
+  });
+
+  it('keeps Leah at 32 by 48 with transparent padding and opaque artwork', () => {
+    const asset = RUNTIME_ASSETS.leah;
+    const image = readRuntimeAsset(asset);
+
+    expect([asset.sourceWidth, asset.sourceHeight]).toEqual([1254, 1254]);
+    expect([asset.width, asset.height]).toEqual([32, 48]);
+    expect([image.width, image.height]).toEqual([asset.width, asset.height]);
+    expect(asset.opaque).toBe(false);
+    expect(image.data[3]).toBe(0);
     expect(image.data.some((_, index) => index % 4 === 3 && image.data[index] === 255)).toBe(true);
   });
 });
