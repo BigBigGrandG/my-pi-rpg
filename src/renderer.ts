@@ -1,9 +1,11 @@
 import { AUTO, Core, Game, Input, Scene, Types } from 'phaser';
+import type { GameObjects } from 'phaser';
 import './index.css';
 import grassTileUrl from '../assets/game/runtime/grass-spring-tile.png';
 import npcLeahUrl from '../assets/game/runtime/npc-leah.png';
 import playerSheetUrl from '../assets/game/runtime/player-male-sheet.png';
 import roadTileUrl from '../assets/game/runtime/road-dirt-tile.png';
+import { getDialogueDefinition } from './domain/dialogue';
 import {
   BUILDING_IDS,
   ENVIRONMENT_ASSET_IDS,
@@ -22,6 +24,11 @@ import {
   type DirectionalInput,
   type InputHistory,
 } from './game/input-history';
+import {
+  createInteractionInputState,
+  recordInteractionInput,
+} from './game/interaction-input';
+import { createDialoguePanel } from './game/dialogue-panel';
 import {
   getRoadRectangles,
   ROAD_CAMERA_SETTINGS,
@@ -87,10 +94,14 @@ class PlayerScene extends Scene {
   private leahShadow: PlayerShadowView | null = null;
   private leahPromptBackground: NpcPromptView | null = null;
   private leahPrompt: NpcPromptView | null = null;
+  private dialoguePanel: GameObjects.Container | null = null;
+  private renderedDialogueNpcId: string | null = null;
   private worldState: WorldState = createWorldState(ROAD_MAP.playerSpawn);
   private cursorKeys: DirectionKeys | null = null;
   private wasdKeys: DirectionKeys | null = null;
+  private interactionKey: DirectionKey | null = null;
   private inputHistory: InputHistory = createInputHistory();
+  private interactionInput = createInteractionInputState();
   private playerPresentation = createPlayerPresentationState();
 
   public constructor() {
@@ -214,13 +225,14 @@ class PlayerScene extends Scene {
         left: Input.Keyboard.KeyCodes.A,
         right: Input.Keyboard.KeyCodes.D,
       }) as DirectionKeys;
+      this.interactionKey = keyboard.addKey(Input.Keyboard.KeyCodes.J);
     }
 
     this.game.events.on(Core.Events.BLUR, this.handleBlur, this);
     this.events.once(Core.Events.DESTROY, this.handleDestroy, this);
 
     this.add
-      .text(16, 16, 'Move: Arrow Keys / WASD | Face Leah to see J', {
+      .text(16, 16, 'Move: Arrow Keys / WASD | Face Leah and press J', {
         color: '#ffffff',
         fontFamily: 'Segoe UI, sans-serif',
         fontSize: '16px',
@@ -234,14 +246,17 @@ class PlayerScene extends Scene {
       return;
     }
 
+    const input = this.readMovementInput();
+    const interactionPressed = this.readInteractionPressed();
     this.worldState = advanceWorld(
       this.worldState,
-      this.readMovementInput(),
+      { ...input, interactionPressed },
       delta / 1000,
       ROAD_WORLD_RULES,
     );
     this.updatePlayerPresentation(delta);
     this.updateLeahPresentation();
+    this.updateDialoguePresentation();
   }
 
   private drawMap(): void {
@@ -326,6 +341,32 @@ class PlayerScene extends Scene {
     this.leahPrompt.setVisible(showPrompt);
   }
 
+  private updateDialoguePresentation(): void {
+    const npcId = this.worldState.dialogue.npcId;
+    if (npcId === null) {
+      this.dialoguePanel?.setVisible(false);
+      return;
+    }
+
+    const dialogue = getDialogueDefinition(npcId);
+    if (dialogue === null) {
+      this.dialoguePanel?.setVisible(false);
+      return;
+    }
+
+    if (this.renderedDialogueNpcId !== npcId) {
+      this.dialoguePanel?.destroy(true);
+      this.dialoguePanel = createDialoguePanel(
+        this,
+        dialogue,
+        GAME_WIDTH,
+        GAME_HEIGHT,
+      );
+      this.renderedDialogueNpcId = dialogue.npcId;
+    }
+    this.dialoguePanel?.setVisible(true);
+  }
+
   private readMovementInput(): InputSnapshot {
     const input: DirectionalInput = {
       up: this.isDirectionDown('up'),
@@ -341,6 +382,15 @@ class PlayerScene extends Scene {
     };
   }
 
+  private readInteractionPressed(): boolean {
+    const result = recordInteractionInput(
+      this.interactionInput,
+      Boolean(this.interactionKey?.isDown),
+    );
+    this.interactionInput = result.state;
+    return result.pressed;
+  }
+
   private isDirectionDown(direction: Direction): boolean {
     return Boolean(
       this.cursorKeys?.[direction]?.isDown || this.wasdKeys?.[direction]?.isDown,
@@ -350,6 +400,7 @@ class PlayerScene extends Scene {
   private handleBlur(): void {
     this.input.keyboard?.resetKeys();
     this.inputHistory = createInputHistory();
+    this.interactionInput = createInteractionInputState();
   }
 
   private handleDestroy(): void {

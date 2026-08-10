@@ -40,6 +40,8 @@ export interface InputSnapshot {
   readonly down: boolean;
   readonly left: boolean;
   readonly right: boolean;
+  /** True only for the frame that receives a new interaction key press. */
+  readonly interactionPressed?: boolean;
   readonly lastPressedDirection?: FacingDirection;
 }
 
@@ -85,27 +87,74 @@ export const createWorldState = (position: PlayerPosition): WorldState => ({
   },
 });
 
+export const toggleDialogue = (
+  state: WorldState,
+  rules: WorldRules,
+): WorldState => {
+  if (state.dialogue.npcId !== null) {
+    return {
+      ...state,
+      interaction: {
+        targetId: null,
+      },
+      dialogue: {
+        npcId: null,
+      },
+      player: {
+        ...state.player,
+        isMoving: false,
+      },
+    };
+  }
+
+  const targetId = rules.interaction
+    ? resolveInteractionTarget(state.player, null, rules.interaction)
+    : null;
+
+  if (targetId === null) {
+    return state;
+  }
+
+  return {
+    ...state,
+    interaction: {
+      targetId: null,
+    },
+    dialogue: {
+      npcId: targetId,
+    },
+    player: {
+      ...state.player,
+      isMoving: false,
+    },
+  };
+};
+
 export const advanceWorld = (
   state: WorldState,
   input: InputSnapshot,
   deltaSeconds: number,
   rules: WorldRules,
 ): WorldState => {
+  const dialogueState = input.interactionPressed
+    ? toggleDialogue(state, rules)
+    : state;
+  const dialogueIsOpen = dialogueState.dialogue.npcId !== null;
   const horizontalDirection = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   const verticalDirection = (input.down ? 1 : 0) - (input.up ? 1 : 0);
   const directionLength = Math.hypot(horizontalDirection, verticalDirection);
   const facing = resolveFacing(
     horizontalDirection,
     verticalDirection,
-    state.player.facing,
+    dialogueState.player.facing,
     input,
   );
 
   const nextPosition =
-    directionLength === 0 || deltaSeconds <= 0
-      ? clampPosition(state.player.position, rules.movementBounds)
+    dialogueIsOpen || directionLength === 0 || deltaSeconds <= 0
+      ? clampPosition(dialogueState.player.position, rules.movementBounds)
       : advancePosition(
-          state.player.position,
+          dialogueState.player.position,
           (horizontalDirection / directionLength) *
             rules.playerSpeed *
             deltaSeconds,
@@ -116,24 +165,28 @@ export const advanceWorld = (
         );
 
   const nextPlayer: PlayerState = {
-    ...state.player,
+    ...dialogueState.player,
     position: nextPosition,
-    facing,
-    isMoving: hasPositionChanged(state.player.position, nextPosition),
+    facing: dialogueIsOpen ? dialogueState.player.facing : facing,
+    isMoving: dialogueIsOpen
+      ? false
+      : hasPositionChanged(dialogueState.player.position, nextPosition),
   };
 
   return {
-    ...state,
+    ...dialogueState,
     player: nextPlayer,
     interaction: rules.interaction
       ? {
-          targetId: resolveInteractionTarget(
-            nextPlayer,
-            state.dialogue.npcId,
-            rules.interaction,
-          ),
+          targetId: dialogueIsOpen
+            ? null
+            : resolveInteractionTarget(
+                nextPlayer,
+                dialogueState.dialogue.npcId,
+                rules.interaction,
+              ),
         }
-      : state.interaction,
+      : dialogueState.interaction,
   };
 };
 
