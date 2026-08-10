@@ -30,6 +30,7 @@ export interface InputSnapshot {
   readonly down: boolean;
   readonly left: boolean;
   readonly right: boolean;
+  readonly lastPressedDirection?: FacingDirection;
 }
 
 export interface MovementBounds {
@@ -38,12 +39,26 @@ export interface MovementBounds {
   readonly playerSize: number;
 }
 
+export interface FootCollider {
+  readonly width: number;
+  readonly height: number;
+  readonly offsetX: number;
+  readonly offsetY: number;
+}
+
+export interface CollisionRules {
+  readonly collider: FootCollider;
+  readonly maxStep: number;
+  readonly canOccupy: (position: PlayerPosition, collider: FootCollider) => boolean;
+}
+
 export interface WorldRules {
   readonly playerSpeed: number;
   readonly movementBounds: MovementBounds;
+  readonly collision?: CollisionRules;
 }
 
-export const PLAYER_SPEED = 200;
+export const PLAYER_SPEED = 160;
 
 export const createWorldState = (position: PlayerPosition): WorldState => ({
   player: {
@@ -72,25 +87,21 @@ export const advanceWorld = (
     horizontalDirection,
     verticalDirection,
     state.player.facing,
+    input,
   );
 
   const nextPosition =
     directionLength === 0 || deltaSeconds <= 0
       ? clampPosition(state.player.position, rules.movementBounds)
-      : clampPosition(
-          {
-            x:
-              state.player.position.x +
-              (horizontalDirection / directionLength) *
-                rules.playerSpeed *
-                deltaSeconds,
-            y:
-              state.player.position.y +
-              (verticalDirection / directionLength) *
-                rules.playerSpeed *
-                deltaSeconds,
-          },
-          rules.movementBounds,
+      : advancePosition(
+          state.player.position,
+          (horizontalDirection / directionLength) *
+            rules.playerSpeed *
+            deltaSeconds,
+          (verticalDirection / directionLength) *
+            rules.playerSpeed *
+            deltaSeconds,
+          rules,
         );
 
   return {
@@ -108,7 +119,21 @@ const resolveFacing = (
   horizontalDirection: number,
   verticalDirection: number,
   currentFacing: FacingDirection,
+  input: InputSnapshot,
 ): FacingDirection => {
+  if (horizontalDirection !== 0 && verticalDirection !== 0) {
+    const lastPressedDirection = input.lastPressedDirection;
+
+    if (
+      lastPressedDirection &&
+      isDirectionActive(input, lastPressedDirection)
+    ) {
+      return lastPressedDirection;
+    }
+
+    return verticalDirection > 0 ? 'down' : 'up';
+  }
+
   if (verticalDirection !== 0) {
     return verticalDirection > 0 ? 'down' : 'up';
   }
@@ -119,6 +144,109 @@ const resolveFacing = (
 
   return currentFacing;
 };
+
+const isDirectionActive = (
+  input: InputSnapshot,
+  direction: FacingDirection,
+): boolean => input[direction];
+
+const advancePosition = (
+  position: PlayerPosition,
+  deltaX: number,
+  deltaY: number,
+  rules: WorldRules,
+): PlayerPosition => {
+  const collision = rules.collision;
+  const start = clampPosition(position, rules.movementBounds);
+
+  if (!collision) {
+    return clampPosition(
+      {
+        x: start.x + deltaX,
+        y: start.y + deltaY,
+      },
+      rules.movementBounds,
+    );
+  }
+
+  const distance = Math.hypot(deltaX, deltaY);
+  const stepCount = Math.max(
+    1,
+    Math.ceil(distance / Math.max(collision.maxStep, 0.0001)),
+  );
+  const stepX = deltaX / stepCount;
+  const stepY = deltaY / stepCount;
+  let next = start;
+
+  for (let step = 0; step < stepCount; step += 1) {
+    next = tryMoveAxis(next, stepX, 0, rules);
+    next = tryMoveAxis(next, 0, stepY, rules);
+  }
+
+  return next;
+};
+
+const tryMoveAxis = (
+  position: PlayerPosition,
+  deltaX: number,
+  deltaY: number,
+  rules: WorldRules,
+): PlayerPosition => {
+  const collision = rules.collision;
+  if (!collision) {
+    return position;
+  }
+
+  const candidate = clampPosition(
+    {
+      x: position.x + deltaX,
+      y: position.y + deltaY,
+    },
+    rules.movementBounds,
+  );
+
+  if (collision.canOccupy(candidate, collision.collider)) {
+    return candidate;
+  }
+
+  return findFurthestWalkablePosition(position, candidate, rules);
+};
+
+const findFurthestWalkablePosition = (
+  start: PlayerPosition,
+  blocked: PlayerPosition,
+  rules: WorldRules,
+): PlayerPosition => {
+  const collision = rules.collision;
+  if (!collision) {
+    return start;
+  }
+
+  let low = 0;
+  let high = 1;
+
+  for (let iteration = 0; iteration < 16; iteration += 1) {
+    const middle = (low + high) / 2;
+    const candidate = interpolatePosition(start, blocked, middle);
+
+    if (collision.canOccupy(candidate, collision.collider)) {
+      low = middle;
+    } else {
+      high = middle;
+    }
+  }
+
+  return interpolatePosition(start, blocked, low);
+};
+
+const interpolatePosition = (
+  start: PlayerPosition,
+  end: PlayerPosition,
+  amount: number,
+): PlayerPosition => ({
+  x: start.x + (end.x - start.x) * amount,
+  y: start.y + (end.y - start.y) * amount,
+});
 
 const hasPositionChanged = (
   previous: PlayerPosition,

@@ -15,9 +15,9 @@ const NO_INPUT: MovementInput = {
 };
 
 describe('advancePlayer', () => {
-  it('moves right at 200 pixels per second', () => {
+  it('moves right at 160 pixels per second', () => {
     expect(advancePlayer({ x: 100, y: 100 }, { ...NO_INPUT, right: true }, 0.5, BOUNDS)).toEqual({
-      x: 200,
+      x: 180,
       y: 100,
     });
   });
@@ -25,7 +25,7 @@ describe('advancePlayer', () => {
   it('moves vertically and normalizes diagonal speed', () => {
     expect(advancePlayer({ x: 100, y: 100 }, { ...NO_INPUT, down: true }, 0.5, BOUNDS)).toEqual({
       x: 100,
-      y: 200,
+      y: 180,
     });
 
     const start = { x: 480, y: 270 };
@@ -36,9 +36,9 @@ describe('advancePlayer', () => {
       BOUNDS,
     );
 
-    expect(Math.hypot(diagonal.x - start.x, diagonal.y - start.y)).toBeCloseTo(100);
-    expect(diagonal.x - start.x).toBeCloseTo(100 / Math.sqrt(2));
-    expect(diagonal.y - start.y).toBeCloseTo(-100 / Math.sqrt(2));
+    expect(Math.hypot(diagonal.x - start.x, diagonal.y - start.y)).toBeCloseTo(80);
+    expect(diagonal.x - start.x).toBeCloseTo(80 / Math.sqrt(2));
+    expect(diagonal.y - start.y).toBeCloseTo(-80 / Math.sqrt(2));
   });
 
   it('cancels opposite inputs while allowing the other axis to move', () => {
@@ -49,7 +49,7 @@ describe('advancePlayer', () => {
         0.5,
         BOUNDS,
       ),
-    ).toEqual({ x: 100, y: 16 });
+    ).toEqual({ x: 100, y: 20 });
 
     expect(
       advancePlayer(
@@ -58,7 +58,7 @@ describe('advancePlayer', () => {
         0.5,
         BOUNDS,
       ),
-    ).toEqual({ x: 200, y: 100 });
+    ).toEqual({ x: 180, y: 100 });
   });
 
   it('stops immediately without input and scales movement by frame time', () => {
@@ -74,7 +74,7 @@ describe('advancePlayer', () => {
         0.25,
         BOUNDS,
       ),
-    ).toEqual({ x: 200, y: 100 });
+    ).toEqual({ x: 180, y: 100 });
   });
 
   it('keeps the complete player inside all four field edges', () => {

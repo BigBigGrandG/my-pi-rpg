@@ -84,6 +84,18 @@ describe('advanceWorld', () => {
     expect(next.player.isMoving).toBe(true);
   });
 
+  it('uses a recent active cardinal direction for diagonal facing', () => {
+    const next = advanceWorld(
+      INITIAL_WORLD,
+      { ...NO_INPUT, up: true, right: true, lastPressedDirection: 'right' },
+      0.5,
+      RULES,
+    );
+
+    expect(next.player.facing).toBe('right');
+    expect(next.player.isMoving).toBe(true);
+  });
+
   it('cancels opposing directions before moving on the remaining axis', () => {
     const next = advanceWorld(
       INITIAL_WORLD,
